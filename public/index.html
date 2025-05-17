@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WireGuard Config Generator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Arial', sans-serif;
+    }
+
+    body {
+      background-color: #e8ecef;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 500px;
+      width: 100%;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      padding: 15px;
+    }
+
+    h1 {
+      font-size: 1.5em;
+      color: #333;
+      text-align: center;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 5px;
+    }
+
+    h3 {
+      font-size: 1.1em;
+      color: #333;
+      margin: 10px 0 5px;
+      font-weight: bold;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 3px;
+    }
+
+    label {
+      display: block;
+      margin: 5px 0 2px;
+      font-size: 0.9em;
+      color: #555;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #aaa;
+      border-radius: 3px;
+      font-size: 0.9em;
+      background: #f9f9f9;
+      margin-bottom: 5px;
+    }
+
+    input[readonly], textarea[readonly] {
+      background: #e9ecef;
+    }
+
+    button {
+      background-color: #0055a4;
+      color: white;
+      padding: 6px 15px;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.9em;
+      margin: 5px 5px 0 0;
+    }
+
+    button:hover {
+      background-color: #004080;
+    }
+
+    #generateKeysBtn {
+      background-color: #28a745;
+    }
+
+    #generateKeysBtn:hover {
+      background-color: #218838;
+    }
+
+    #result {
+      margin-top: 15px;
+      text-align: center;
+    }
+
+    #message {
+      font-size: 0.9em;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    #qrCode {
+      max-width: 150px;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      margin: 10px 0;
+    }
+
+    a {
+      display: inline-block;
+      margin: 5px;
+      padding: 6px 15px;
+      background-color: #dc3545;
+      color: white;
+      text-decoration: none;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+
+    a:hover {
+      background-color: #c82333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>WireGuard Config Generator</h1>
+
+    <!-- General Section -->
+    <label>Name: <input type="text" name="name" id="name" required></label>
+
+    <!-- Interface Section -->
+    <h3>[Interface]</h3>
+    <label>Key Mode:
+      <select name="keyMode" id="keyMode" onchange="toggleKeyMode()">
+        <option value="generate">Generate Automatically</option>
+        <option value="manual">Enter Manually</option>
+      </select>
+    </label>
+    <label>PrivateKey: <input type="text" name="privateKey" id="privateKey" readonly></label>
+    <button type="button" id="generateKeysBtn" onclick="generateKeys()">Generate Keys</button>
+    <label>PublicKey (Client): <textarea id="publicKey" readonly rows="2"></textarea></label>
+    <label>Address: <input type="text" name="address" id="address" required></label>
+    <label>DNS: <input type="text" name="dns" id="dns" value="1.1.1.1"></label>
+
+    <!-- Peer Section -->
+    <h3>[Peer]</h3>
+    <label>ListenPort: <input type="text" name="listenPort" id="listenPort"></label>
+    <label>PublicKey (Server): <input type="text" name="publicKeyServer" id="publicKeyServer" required></label>
+    <label>PresharedKey: <input type="text" name="presharedKey" id="presharedKey"></label>
+    <label>AllowedIPs: <input type="text" name="allowedIPs" id="allowedIPs" required></label>
+    <label>Endpoint: <input type="text" name="endpoint" id="endpoint" required></label>
+    <label>PersistentKeepalive: <input type="text" name="persistentKeepalive" id="persistentKeepalive"></label>
+
+    <!-- Submit Button -->
+    <div>
+      <button type="button" onclick="generateConfig()">Generate</button>
+    </div>
+
+    <!-- Result Section -->
+    <div id="result">
+      <p id="message"></p>
+      <img id="qrCode" alt="QR Code will appear here">
+      <a id="downloadConfig" style="display:none">Download Config</a>
+      <a id="downloadQR" style="display:none">Download QR Code</a>
+    </div>
+  </div>
+
+  <script>
+    const privateKeyInput = document.getElementById('privateKey');
+    const publicKeyDisplay = document.getElementById('publicKey');
+    const generateKeysBtn = document.getElementById('generateKeysBtn');
+    const keyModeSelect = document.getElementById('keyMode');
+
+    function toggleKeyMode() {
+      const keyMode = keyModeSelect.value;
+      if (keyMode === 'generate') {
+        privateKeyInput.readOnly = true;
+        generateKeysBtn.disabled = false;
+        privateKeyInput.value = '';
+        publicKeyDisplay.value = '';
+      } else {
+        privateKeyInput.readOnly = false;
+        generateKeysBtn.disabled = true;
+        privateKeyInput.value = '';
+        publicKeyDisplay.value = '';
+      }
+    }
+
+    async function generateKeys() {
+      const response = await fetch('/api/generate-keys', { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        privateKeyInput.value = data.privateKey;
+        publicKeyDisplay.value = data.publicKey;
+      } else {
+        alert('Error generating keys: ' + data.error);
+      }
+    }
+
+    async function generateConfig() {
+      const formData = {
+        name: document.getElementById('name').value,
+        privateKey: privateKeyInput.value,
+        address: document.getElementById('address').value,
+        dns: document.getElementById('dns').value,
+        listenPort: document.getElementById('listenPort').value,
+        publicKeyServer: document.getElementById('publicKeyServer').value,
+        presharedKey: document.getElementById('presharedKey').value,
+        allowedIPs: document.getElementById('allowedIPs').value,
+        endpoint: document.getElementById('endpoint').value,
+        persistentKeepalive: document.getElementById('persistentKeepalive').value
+      };
+
+      const response = await fetch('/api/generate-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        document.getElementById('message').textContent = 
+          `Config generated successfully!\n${result.listenPortMessage}\nCopy the Client PublicKey above for MikroTik Peer.`;
+        document.getElementById('qrCode').src = result.qrCodeData;
+        document.getElementById('downloadConfig').href = `/api/download/${result.configFile}`;
+        document.getElementById('downloadConfig').style.display = 'inline-block';
+        document.getElementById('downloadQR').href = `/api/download/${result.qrCodeFile}`;
+        document.getElementById('downloadQR').style.display = 'inline-block';
+      } else {
+        alert('Error: ' + result.error);
+      }
+    }
+
+    // Initialize
+    toggleKeyMode();
+  </script>
+</body>
+</html>
